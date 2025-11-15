@@ -106,6 +106,7 @@ kubectl get svc -n wordpress
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
 📁 Repository Structure
+
 Syfe-Assignment-main/
 ├── helm-chart/
 ├── mysql-build/
