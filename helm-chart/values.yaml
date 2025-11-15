@@ -1,5 +1,4 @@
 replicaCount: 2
-
 image:
   nginx:
     repository: yash010jain/openresty-wordpress
