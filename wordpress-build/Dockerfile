@@ -5,5 +5,6 @@ FROM wordpress:php8.0-apache
 
 # ensure correct permissions
 RUN chown -R www-data:www-data /var/www/html
+ 
 
 EXPOSE 80

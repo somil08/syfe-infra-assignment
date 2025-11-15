@@ -1,3 +1,4 @@
+
 FROM openresty/openresty:alpine
 
 # copy configs

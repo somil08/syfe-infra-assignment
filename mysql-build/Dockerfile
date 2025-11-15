@@ -1,3 +1,4 @@
+
 FROM mysql:8.0
 
 # copy initialization SQL
