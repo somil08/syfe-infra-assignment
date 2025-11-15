@@ -1,46 +1,61 @@
-🏗️ WordPress Production Deployment on Kubernetes
+🏗️ Production-Grade WordPress Deployment on Kubernetes
+Syfe Infra Assignment – Complete Implementation Guide
 
-Enterprise-Grade, Scalable, Secure & Monitored WordPress Setup
+This repository contains a fully production-ready WordPress deployment built to satisfy the exact objectives of the Syfe assignment.
 
-This repository provides a production-ready, highly scalable WordPress deployment on Kubernetes designed for:
+The solution demonstrates skills across:
 
-High availability
+Kubernetes
 
-Horizontal scaling
+Helm
 
-Enterprise performance
+Docker
 
-Deep monitoring & alerting
+Nginx + OpenResty + Lua
 
-The setup includes:
+Persistent Storage (RWX)
 
-OpenResty/Nginx + Lua for advanced routing & security
+Prometheus + Grafana Monitoring
 
-Optimized MySQL StatefulSet
+Alerting Rules
 
-Prometheus + Grafana monitoring
+Cloud-native architecture
 
-ReadWriteMany persistent storage for multi-pod scaling
+🎯 Assignment Objectives (Mapped & Achieved)
+✅ Objective #1 – Run a Production WordPress App on Kubernetes
 
-| Category        | Features                                                     |
-| --------------- | ------------------------------------------------------------ |
-| **Scalability** | HPA (3–10 replicas), RWX volumes, load-balanced architecture |
-| **Performance** | OpenResty + Lua, PHP-FPM tuning, Redis-ready                 |
-| **Reliability** | MySQL StatefulSet, auto-recovery, persistent volumes         |
-| **Monitoring**  | Kube-Prometheus, 50+ metrics, Grafana dashboards             |
-| **Security**    | Lua rate limiting, hardened configs                          |
-| **Storage**     | RWX (NFS/CephFS)                                             |
-| **Automation**  | Fully Helm-based deployment                                  |
+This project implements:
+| Requirement                                  | Status  | Explanation                                         |
+| -------------------------------------------- | ------- | --------------------------------------------------- |
+| **PersistentVolume & PersistentVolumeClaim** | ✔️ Done | Created PV/PVC for WordPress + MySQL                |
+| **ReadWriteMany volume**                     | ✔️ Done | RWX PVC used to allow multiple WordPress pods       |
+| **Dockerfiles for WordPress, MySQL, Nginx**  | ✔️ Done | Custom production Dockerfiles                       |
+| **Nginx proxy → WordPress**                  | ✔️ Done | All traffic routed via OpenResty                    |
+| **OpenResty compiled with Lua**              | ✔️ Done | Custom build using provided `./configure` flags     |
+| **Helm chart deployment**                    | ✔️ Done | Deploy using `helm install my-release ./helm-chart` |
+| **Helm uninstall**                           | ✔️ Done | Cleanup: `helm delete my-release`                   |
+
+✅ Objective #2 – Setup Monitoring & Alerting
+| Requirement                            | Status       | Explanation                    |
+| -------------------------------------- | ------------ | ------------------------------ |
+| Deploy Prometheus + Grafana            | ✔️ Done      | Using kube-prometheus-stack    |
+| Pod CPU Utilization                    | ✔️ Collected | Shown in Grafana dashboard     |
+| Nginx Total Request Count              | ✔️ Collected | Using OpenResty Lua module     |
+| Nginx 5xx Errors                       | ✔️ Collected | Exposed via Prometheus metrics |
+| WordPress / Apache / Nginx metrics doc | ✔️ Included  | Provided below                 |
+| Single repo with Helm charts + README  | ✔️ Done      | This repository                |
+
+🧱 High-Level Architecture
 
                            ┌─────────────────────────────────────┐
-                           │     Load Balancer / Ingress         │
+                           │     External Load Balancer          │
                            └─────────────────────────────────────┘
                                          │
                     ┌────────────────────┴────────────────────┐
                     │                                         │
          ┌──────────▼──────────┐                 ┌────────────▼──────────┐
-         │    Nginx Pod #1     │                 │    Nginx Pod #N       │
-         │  (OpenResty + Lua)  │                 │  (OpenResty + Lua)    │
+         │   Nginx (OpenResty) │                 │   Nginx (OpenResty)   │
+         │  Lua + Rate Limit   │                 │  Lua + Metrics        │
          └──────────┬──────────┘                 └────────────┬──────────┘
                     │                                         │
          ┌──────────▼──────────┐                 ┌────────────▼──────────┐
@@ -48,163 +63,168 @@ ReadWriteMany persistent storage for multi-pod scaling
          └──────────┬──────────┘                 └────────────┬──────────┘
                     └────────────────────┬─────────────────────┘
                                          │
-                               ┌─────────▼────────┐
-                               │   MySQL StatefulSet │
-                               └─────────────────────┘
+                               ┌─────────▼────────────┐
+                               │   MySQL StatefulSet   │
+                               │   Persistent Storage  │
+                               └───────────────────────┘
 
-| Tool       | Version | Purpose                |
-| ---------- | ------- | ---------------------- |
-| Kubernetes | 1.24+   | Deployment environment |
-| Helm       | 3.x     | Package management     |
-| Docker     | 20.10+  | Image builds           |
-| kubectl    | 1.24+   | K8s CLI                |
+📁 Repository Structure
+Syfe-Assignment-main/
+├── helm-chart/                  # Main Helm Chart for WordPress stack
+│   ├── templates/
+│   ├── values.yaml
+│   └── Chart.yaml
+│
+├── openresty-build/             # Custom OpenResty Dockerfile
+├── wordpress-build/             # Custom WordPress Dockerfile
+├── mysql-build/                 # Custom MySQL Dockerfile
+│
+├── prometheus/                  # Monitoring configs
+│   ├── prometheus-values.yaml
+│   └── prometheus-rules.yaml
+│
+└── README.md
+🧰 Custom OpenResty (Nginx + Lua) Build
+✔️ Assignment Requires These Flags
 
-Cluster Requirements
+The following configuration is compiled into the Nginx/OpenResty image:
+./configure --prefix=/opt/openresty \
+  --with-pcre-jit \
+  --with-ipv6 \
+  --without-http_redis2_module \
+  --with-http_iconv_module \
+  --with-http_postgres_module
 
-4+ vCPU, 8GB RAM
+Why?
+| Flag                           | Purpose                  |
+| ------------------------------ | ------------------------ |
+| `--with-pcre-jit`              | Faster regex performance |
+| `--with-ipv6`                  | Dual-stack networking    |
+| `--with-http_iconv_module`     | Encoding conversions     |
+| `--with-http_postgres_module`  | PostgreSQL Lua support   |
+| `--without-http_redis2_module` | Lightweight build        |
 
-RWX storage class (NFS, CephFS, EFS, GlusterFS)
+📦 Persistent Volume Setup (RWX)
 
-LoadBalancer support (AWS/GCP/Azure/MetalLB)
+RWX is required because multiple WordPress pods will share the same content.
 
-⚡ Quick Start
-1️⃣ Clone Repository
-git clone https://github.com/somil108/syfe-infra-assignment.git
-cd syfe-infra-assignment
+Example PV/PVC (NFS):
 
-2️⃣ Build & Push Images
-docker build -t your/openresty:latest openresty-build/
-docker build -t your/wordpress:latest wordpress-build/
-docker build -t your/mysql:8.0 mysql-build/
+accessModes:
+  - ReadWriteMany
+storageClassName: nfs-client
 
-3️⃣ Configure Helm Values
-cp helm-chart/values.example.yaml helm-chart/values.yaml
+⚡ Deployment (Helm)
+Install
+helm install my-release ./helm-chart -n wordpress --create-namespace
 
+Cleanup
+helm delete my-release -n wordpress
 
-Update:
-
-Image registry
-
-DB credentials
-
-Storage class
-
-Autoscaling settings
-
-4️⃣ Deploy WordPress
-helm install my-wordpress ./helm-chart \
-  --namespace wordpress \
-  --create-namespace
-
-5️⃣ Deploy Monitoring
+🛠️ Monitoring & Alerting (Prometheus + Grafana)
+Installation
 helm install prom prometheus-community/kube-prometheus-stack \
   -n monitoring --create-namespace \
   -f prometheus/prometheus-values.yaml
 
-6️⃣ Access Services
-kubectl get svc -n wordpress
+View Grafana Dashboard
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
-📁 Repository Structure
 
-Syfe-Assignment-main/
-├── helm-chart/
-├── mysql-build/
-├── nginx-build/
-├── openresty-build/
-├── prometheus/
-├── wordpress-build/
-└── README.md
+Visit: http://localhost:3000
 
-🔧 Custom Components
-1. OpenResty / Nginx
+📊 Metrics Document (WordPress, Nginx, MySQL)
+This is a required part of the assignment.
 
-Lua rate limiting
+1. WordPress Metrics (PHP-FPM)
 
-Security headers
+| Metric                         | Meaning               |
+| ------------------------------ | --------------------- |
+| `php_fpm_processes_total`      | Total PHP-FPM workers |
+| `php_fpm_slow_requests`        | Slow requests count   |
+| `php_fpm_max_children_reached` | Worker saturation     |
+| CPU & Memory Usage             | Pod performance       |
+| Ingress Latency                | WordPress load speed  |
 
-Prometheus metrics endpoint
+2. Nginx / OpenResty Metrics
 
-Custom routing logic
+Collected via Lua + Prometheus exporter:
+| Metric                                     | Description                   |
+| ------------------------------------------ | ----------------------------- |
+| `nginx_http_requests_total`                | Total request count           |
+| `nginx_http_request_duration_seconds`      | Latency                       |
+| `nginx_http_requests_total{status=~"5.."}` | Total 5xx errors              |
+| Active Connections                         | Real-time traffic             |
+| Upstream Response Time                     | WordPress backend performance |
 
-2. WordPress PHP-FPM
+3. MySQL Metrics
 
-PHP 8.2 FPM
+| Metric                             | Description           |
+| ---------------------------------- | --------------------- |
+| `mysql_up`                         | Database availability |
+| `mysql_global_status_connections`  | Open connections      |
+| `mysql_global_status_slow_queries` | Slow queries          |
+| `mysql_global_status_queries`      | Queries per second    |
+| Disk usage                         | PV health             |
 
-Redis extension
-
-OPcache tuning
-
-WP-CLI included
-
-3. MySQL StatefulSet
-
-WordPress optimized config
-
-Slow query logging
-
-InnoDB tuning
-
-📊 Monitoring & Alerting
-
-Includes:
-
-Nginx request metrics
-
-PHP-FPM performance
-
-MySQL slow queries
-
-Pod CPU/RAM
-
-Disk/PVC usage
-
-Prometheus rules include:
-
-Critical
+🔔 Alerting Rules (Prometheus)
+Critical Alerts
 - alert: MySQLDown
   expr: mysql_up == 0
 
-Warning
-- alert: HighMemoryUsage
-  expr: container_memory_usage > 0.85
+Warning Alerts
+- alert: HighCPUUsage
+  expr: container_cpu_usage_seconds_total > 0.85
 
-🧰 Operations
-Scale Pods
-kubectl scale deploy my-wordpress -n wordpress --replicas=5
+- alert: Nginx5xxHigh
+  expr: sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) > 10
 
-Upgrade WordPress
-helm upgrade my-wordpress ./helm-chart \
-  --set image.wordpress.tag=6.4.2
+🔧 Operations
+Scale WordPress
+kubectl scale deploy my-release-wordpress --replicas=5 -n wordpress
 
-Backup Database
-kubectl exec my-wordpress-mysql-0 -n wordpress -- \
+Backup MySQL
+kubectl exec my-release-mysql-0 -n wordpress -- \
   mysqldump -u root -pPASSWORD wordpress > backup.sql
 
 🛠️ Troubleshooting
-
-PVC Pending:
-
+PVC Pending
 kubectl logs -n kube-system -l app=nfs-provisioner
 
-
-High 5xx errors:
-
+High 5xx Errors
 kubectl logs -n wordpress -l app=nginx -c nginx
 
-
-MySQL connection errors:
-
+MySQL Connection Issues
 kubectl exec -n wordpress POD -- mysql -h mysql -u wordpress -p
 
 ✅ Post-Deployment Checklist
 
-✔ Pods running
-✔ PVCs bound
-✔ Metrics visible in Grafana
-✔ Alerts firing
-✔ WordPress URL active
+✔ RWX PVC created
 
-📜 License
+✔ WordPress + Nginx running
 
-MIT
+✔ OpenResty with Lua built
+
+✔ MySQL StatefulSet healthy
+
+✔ HPA scaling verified
+
+✔ Prometheus & Grafana dashboards live
+
+✔ Alerts firing properly
+
+✔ Clean uninstall via Helm
+
+🏁 Conclusion
+
+This repository successfully delivers all requirements of the Syfe Infra Assignment:
+
+✔ Kubernetes
+✔ Helm
+✔ Docker
+✔ OpenResty + Lua
+✔ Monitoring & Alerting
+✔ RWX Storage
+✔ Scalable WordPress Architecture
+
+A complete, production-grade WordPress infrastructure.
