@@ -1,0 +1,41 @@
+{{- if .Values.wordpress.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "wordpress-app.fullname" . }}-wordpress-pv
+  labels:
+    {{- include "wordpress-app.labels" . | nindent 4 }}
+    component: wordpress
+spec:
+  capacity:
+    storage: {{ .Values.wordpress.persistence.size }}
+  accessModes:
+    - {{ .Values.wordpress.persistence.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.wordpress.persistence.storageClass }}
+  hostPath:
+    path: /mnt/data/wordpress
+    type: DirectoryOrCreate
+{{- end }}
+
+{{- if .Values.mysql.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "wordpress-app.fullname" . }}-mysql-pv
+  labels:
+    {{- include "wordpress-app.labels" . | nindent 4 }}
+    component: mysql
+spec:
+  capacity:
+    storage: {{ .Values.mysql.persistence.size }}
+  accessModes:
+    - {{ .Values.mysql.persistence.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.mysql.persistence.storageClass }}
+  hostPath:
+    path: /mnt/data/mysql
+    type: DirectoryOrCreate
+{{- end }}

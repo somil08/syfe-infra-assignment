@@ -1,0 +1,67 @@
+{{- if .Values.nginx.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  labels:
+    {{- include "wordpress-app.labels" . | nindent 4 }}
+    component: nginx
+spec:
+  type: {{ .Values.nginx.service.type }}
+  ports:
+  - port: {{ .Values.nginx.service.port }}
+    targetPort: {{ .Values.nginx.service.targetPort }}
+    protocol: TCP
+    name: http
+  - port: {{ .Values.nginx.service.metricsPort }}
+    targetPort: 9145
+    protocol: TCP
+    name: metrics
+  selector:
+    {{- include "wordpress-app.selectorLabels" . | nindent 4 }}
+    component: nginx
+{{- end }}
+
+{{- if .Values.wordpress.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress-service
+  labels:
+    {{- include "wordpress-app.labels" . | nindent 4 }}
+    component: wordpress
+spec:
+  type: {{ .Values.wordpress.service.type }}
+  ports:
+  - port: {{ .Values.wordpress.service.port }}
+    targetPort: 9000
+    protocol: TCP
+    name: php-fpm
+  selector:
+    {{- include "wordpress-app.selectorLabels" . | nindent 4 }}
+    component: wordpress
+{{- end }}
+
+{{- if .Values.mysql.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  labels:
+    {{- include "wordpress-app.labels" . | nindent 4 }}
+    component: mysql
+spec:
+  type: {{ .Values.mysql.service.type }}
+  ports:
+  - port: {{ .Values.mysql.service.port }}
+    targetPort: 3306
+    protocol: TCP
+    name: mysql
+  selector:
+    {{- include "wordpress-app.selectorLabels" . | nindent 4 }}
+    component: mysql
+  clusterIP: None  # Headless service for StatefulSet compatibility
+{{- end }}

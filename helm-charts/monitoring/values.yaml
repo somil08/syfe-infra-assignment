@@ -1,0 +1,211 @@
+# Monitoring Stack Configuration
+# Prometheus and Grafana for WordPress monitoring
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  
+  server:
+    global:
+      scrape_interval: 30s
+      scrape_timeout: 10s
+      evaluation_interval: 30s
+    
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+      storageClass: standard
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    
+    retention: "15d"
+  
+  alertmanager:
+    enabled: true
+    persistentVolume:
+      enabled: true
+      size: 2Gi
+      storageClass: standard
+  
+  # Scrape configs for WordPress components
+  serverFiles:
+    prometheus.yml:
+      scrape_configs:
+        - job_name: 'kubernetes-pods'
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+        
+        - job_name: 'nginx-metrics'
+          static_configs:
+            - targets: ['nginx-service:9145']
+          metrics_path: '/metrics'
+        
+        - job_name: 'kubernetes-nodes'
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+        
+        - job_name: 'kubernetes-cadvisor'
+          kubernetes_sd_configs:
+            - role: node
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+            - target_label: __address__
+              replacement: kubernetes.default.svc:443
+            - source_labels: [__meta_kubernetes_node_name]
+              regex: (.+)
+              target_label: __metrics_path__
+              replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+  
+  # Alert rules
+  serverFiles:
+    alerting_rules.yml:
+      groups:
+        - name: wordpress_alerts
+          interval: 30s
+          rules:
+            - alert: HighCPUUsage
+              expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High CPU usage detected"
+                description: "Pod {{ $labels.pod }} CPU usage is above 80%"
+            
+            - alert: HighMemoryUsage
+              expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "High memory usage detected"
+                description: "Pod {{ $labels.pod }} memory usage is above 80%"
+            
+            - alert: High5xxErrors
+              expr: rate(nginx_http_requests_5xx[5m]) > 10
+              for: 2m
+              labels:
+                severity: critical
+              annotations:
+                summary: "High rate of 5xx errors"
+                description: "Nginx is returning more than 10 5xx errors per second"
+            
+            - alert: PodRestartingTooOften
+              expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Pod restarting frequently"
+                description: "Pod {{ $labels.pod }} has restarted {{ $value }} times"
+            
+            - alert: ServiceDown
+              expr: up == 0
+              for: 2m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Service is down"
+                description: "{{ $labels.job }} service is down"
+
+# Grafana configuration
+grafana:
+  enabled: true
+  
+  adminPassword: "admin123"  # Change in production!
+  
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: standard
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+  
+  service:
+    type: LoadBalancer
+    port: 80
+  
+  # Datasources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://monitoring-prometheus-server
+          access: proxy
+          isDefault: true
+  
+  # Pre-configured dashboards
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  
+  dashboards:
+    default:
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      nginx-metrics:
+        gnetId: 12708
+        revision: 1
+        datasource: Prometheus
+      pod-metrics:
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+  
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/"
+    analytics:
+      check_for_updates: true
+    security:
+      admin_user: admin
+      admin_password: admin123
+    users:
+      allow_sign_up: false
